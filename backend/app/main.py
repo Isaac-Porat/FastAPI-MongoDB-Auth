@@ -1,11 +1,11 @@
 import logging
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from pymongo import MongoClient
 from contextlib import asynccontextmanager
 from config import MONGODB_COLLECTION_NAME, MONGODB_DATABASE_NAME, MONGODB_DATABASE_URL
-from models import User
 from auth import login_for_access_token, register_for_access_token
 
 app = FastAPI()
@@ -39,13 +39,16 @@ if environment == "dev":
 async def root():
     return {"message": "Hello World"}
 
-@app.post("/register")
-async def register(user: User):
-    register_for_access_token(user)
-
 @app.post("/login")
-async def login(user: User):
-    login_for_access_token(user)
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    response = await login_for_access_token(form_data)
+    return response
+
+@app.post("/register")
+async def register(form_data: OAuth2PasswordRequestForm = Depends()):
+    response = await register_for_access_token(form_data)
+    return response
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
