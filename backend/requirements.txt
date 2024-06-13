@@ -1,7 +1,0 @@
-pymongo[srv]
-python-dotenv
-pydantic[email]
-uvicorn
-fastapi
-pyjwt
-passlib[bcrypt]
