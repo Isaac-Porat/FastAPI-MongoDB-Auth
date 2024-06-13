@@ -1,10 +1,15 @@
+from datetime import timedelta, datetime
 from fastapi import HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
+import jwt
 from config import ACCESS_TOKEN_EXPIRE_MINUTES
 from crud import authenticate_user
+from config import JWT_SECRET_KEY, HASHING_ALGORITHM
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 def get_password_hash(password):
     return pwd_context.hash(password)
@@ -15,7 +20,7 @@ def create_access_token(data: dict):
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
 
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=HASHING_ALGORITHM)
 
     return encoded_jwt
 
@@ -32,7 +37,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
 
 def verify_token(token: str, credentials_exception):
   try:
-      payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+      payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[HASHING_ALGORITHM])
       email: str = payload.get("sub")
       if email is None:
           raise credentials_exception
