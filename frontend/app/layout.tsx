@@ -6,11 +6,11 @@ import { cn } from "@/lib/utils";
 
 const fontSans = FontSans({
   subsets: ["latin"],
-  variable: "--font-sans"
+  variable: "--font-sans",
 });
 
 export const metadata: Metadata = {
-  title: "...",
+  title: "mongodb-arch",
   description: "...",
 };
 
@@ -22,13 +22,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head />
-        <body
-          className={cn(
-            "min-h-screen bg-background font-sans antialiased",
-            fontSans.variable
-          )}
-        >
-        </body>
+      <body
+        className={cn(
+          "min-h-screen font-sans antialiased",
+          fontSans.variable
+        )}
+      >
+        {children}
+      </body>
     </html>
   );
 }
