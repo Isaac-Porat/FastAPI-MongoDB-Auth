@@ -8,7 +8,8 @@ import uvicorn
 from motor.motor_asyncio import AsyncIOMotorClient
 from contextlib import asynccontextmanager
 from models import Token
-from auth import register_user, login_user
+from auth import register_user, login_user, get_current_user
+from admin import create_admin_user, get_current_admin_user
 
 load_dotenv()
 
@@ -21,17 +22,21 @@ MONGODB_COLLECTION_NAME = os.getenv("MONGODB_COLLECTION_NAME")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.client = AsyncIOMotorClient(MONGODB_DATABASE_URL)
+    try:
+        app.client = AsyncIOMotorClient(MONGODB_DATABASE_URL)
+        app.db = app.client[MONGODB_DATABASE_NAME]
+        app.collection = app.db.get_collection(MONGODB_COLLECTION_NAME)
 
-    app.db = app.client[MONGODB_DATABASE_NAME]
+        logger.warning(f"Connected to MongoDB collection: {app.collection}")
+    except Exception as e:
+        logger.error(f"Failed to connect to MongoDB: {e}")
+        raise
 
-    app.collection = app.db.get_collection(MONGODB_COLLECTION_NAME)
-
-    logger.warning(f"Connected to MongoDB collection: {app.collection}")
+    create_admin_user(app.collection)
 
     yield
 
-    await app.client.close()
+    app.client.close()
 
 app = FastAPI(lifespan=lifespan)
 
@@ -60,6 +65,17 @@ async def register(user: OAuth2PasswordRequestForm = Depends()) -> Token:
 async def login(user: OAuth2PasswordRequestForm = Depends()) -> Token:
    access_token = await login_user(app.collection, user)
    return access_token
+
+@app.get("/users/me")
+async def get_current_active_user(token: str = Depends(get_current_user)):
+    logger.warning("Reached the /users/me endpoint")
+    logger.warning(token)
+    return token # username of account
+
+@app.get("/admin/me")
+async def get_dashboard(token: str = Depends(get_current_admin_user)):
+    logger.warning(token)
+    return {"status_code": 200, "message": "Admin user authenticated successfully"}
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
