@@ -8,6 +8,7 @@ import jwt
 from models import Token
 from exceptions import UsernameAlreadyExistsException, check_username_exists
 from pymongo.errors import PyMongoError
+from pymongo.collection import Collection
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -37,22 +38,25 @@ def create_access_token(data: dict):
 def verify_token(token: str, credentials_exception):
     try:
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[HASHING_ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
+        username: str = payload.get("sub")
+        logger.warning(username)
+        if username is None:
             raise credentials_exception
-        return email
+        return username
     except jwt.PyJWTError:
         raise credentials_exception
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
+    logger.warning("Reached get_current_user code")
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    logger.warning(f"Headers receieved: {token}")
     return verify_token(token, credentials_exception)
 
-async def register_user(collection, user_data: OAuth2PasswordRequestForm) -> Token:
+async def register_user(collection: Collection, user_data: OAuth2PasswordRequestForm) -> Token:
     try:
         # Check if the username already exists in the database
         await check_username_exists(collection, user_data.username)
@@ -64,7 +68,7 @@ async def register_user(collection, user_data: OAuth2PasswordRequestForm) -> Tok
         result = await collection.insert_one({"username": user_data.username, "password": hashed_password})
 
         # Generate an access token for the new user
-        access_token = create_access_token(data={"sub": str(result.inserted_id)})
+        access_token = create_access_token(data={"sub": str(user_data.username)})
 
         # Return the access token and token type
         return Token(access_token=access_token, token_type="bearer")
@@ -91,7 +95,7 @@ async def register_user(collection, user_data: OAuth2PasswordRequestForm) -> Tok
             detail="An unexpected error occurred"
         )
 
-async def login_user(collection, user: OAuth2PasswordRequestForm = Depends()) -> Token:
+async def login_user(collection: Collection, user: OAuth2PasswordRequestForm = Depends()) -> Token:
   try:
       # Check if the username exists in the database
       result = await collection.find_one({"username": user.username})
@@ -105,7 +109,7 @@ async def login_user(collection, user: OAuth2PasswordRequestForm = Depends()) ->
           )
 
       # Generate an access token for the new user
-      access_token = create_access_token(data={"sub": str(result['_id'])})
+      access_token = create_access_token(data={"sub": str(user.username)})
 
       # Return the access token and token type
       return Token(access_token=access_token, token_type="bearer")
