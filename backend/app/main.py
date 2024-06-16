@@ -61,21 +61,18 @@ async def register(user: OAuth2PasswordRequestForm = Depends()) -> Token:
     access_token = await register_user(app.collection, user)
     return access_token
 
-@app.post("/login")
+@app.post("/login", response_model=Token)
 async def login(user: OAuth2PasswordRequestForm = Depends()) -> Token:
    access_token = await login_user(app.collection, user)
    return access_token
 
 @app.get("/users/me")
 async def get_current_active_user(token: str = Depends(get_current_user)):
-    logger.warning("Reached the /users/me endpoint")
-    logger.warning(token)
-    return token # username of account
+    return token
 
 @app.get("/admin/me")
 async def get_dashboard(token: str = Depends(get_current_admin_user)):
-    logger.warning(token)
-    return {"status_code": 200, "message": "Admin user authenticated successfully"}
+    return token
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
