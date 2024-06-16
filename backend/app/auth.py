@@ -25,6 +25,9 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 def get_password_hash(password):
     return pwd_context.hash(password)
 
+def verify_password(original_password, hashed_password):
+    return pwd_context.verify(original_password, hashed_password)
+
 def create_access_token(data: dict):
     to_encode = data.copy()
 
@@ -35,26 +38,29 @@ def create_access_token(data: dict):
 
     return encoded_jwt
 
-def verify_token(token: str, credentials_exception):
+async def get_current_user(collection: Collection, token: str = Depends(oauth2_scheme)):
+
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
     try:
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[HASHING_ALGORITHM])
         username: str = payload.get("sub")
         logger.warning(username)
         if username is None:
             raise credentials_exception
-        return username
     except jwt.PyJWTError:
         raise credentials_exception
 
-async def get_current_user(token: str = Depends(oauth2_scheme)):
-    logger.warning("Reached get_current_user code")
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    logger.warning(f"Headers receieved: {token}")
-    return verify_token(token, credentials_exception)
+    result = await collection.find_one({"username": username})
+
+    if result is None:
+        raise credentials_exception
+
+    return result == username
 
 async def register_user(collection: Collection, user_data: OAuth2PasswordRequestForm) -> Token:
     try:
@@ -101,7 +107,7 @@ async def login_user(collection: Collection, user: OAuth2PasswordRequestForm = D
       result = await collection.find_one({"username": user.username})
 
       # If the username exists, check to ensure the password and hashed password are the same
-      if not pwd_context.verify(user.password, result['password']):
+      if not verify_password(user.password, result['password']):
           raise HTTPException(
               status_code=status.HTTP_401_UNAUTHORIZED,
               detail="Incorrect username or password",
