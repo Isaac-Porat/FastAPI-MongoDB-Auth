@@ -2,7 +2,7 @@ import requests
 
 def register_test_api():
     try:
-        register_attempt = requests.post("http://localhost:8000/register", data={"username": "testuser30", "password": "testpassword"})
+        register_attempt = requests.post("http://localhost:8000/register", data={"username": "testuser41", "password": "testpassword"})
         register_attempt.raise_for_status()
         print(register_attempt.json())
     except requests.exceptions.HTTPError as err:
