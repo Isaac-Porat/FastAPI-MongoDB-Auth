@@ -34,12 +34,16 @@ def create_admin_user(collection: Collection):
     except Exception as e:
         logger.error(f"Unexpected error while creating admin user: {e}", exc_info=True)
 
-async def get_current_admin_user(token: str = Depends(get_current_user)):
-  logger.warning(token)
-  if token != ADMIN_USERNAME:
-      raise HTTPException(
-          status_code=status.HTTP_401_UNAUTHORIZED,
+async def get_current_admin_user(collection: Collection, token: str = Depends(get_current_user)):
+    username = token
+
+    result = await collection.find_one({"username": username})
+
+    if result is False:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
           detail="Unauthorized access attempt by non-admin user",
           headers={"WWW-Authenticate": "Bearer"},
-      )
-  return {"status_code": 200, "message": "Admin user authenticated successfully"}
+    )
+
+    return username
