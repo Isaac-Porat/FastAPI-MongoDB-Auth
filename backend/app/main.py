@@ -5,13 +5,12 @@ from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 import uvicorn
-from contextlib import asynccontextmanager
 from models import Token
-from motor.motor_asyncio import AsyncIOMotorClient
 from auth import register_user, login_user, get_current_user
 from admin import create_admin_user, get_current_admin_user
 from config import MONGODB_DATABASE_URL, MONGODB_DATABASE_NAME, MONGODB_COLLECTION_NAME
 from database import MongoMiddleware
+from crud import fetch_all_users, delete_user_by_username
 
 load_dotenv()
 
@@ -70,6 +69,17 @@ async def get_current_active_user(request: Request, token: str = Depends(get_cur
 @app.get("/admin/me")
 async def get_dashboard(token: str = Depends(get_current_admin_user)):
     return token
+
+@app.get("/admin/users")
+async def get_all_users(request: Request, token: str = Depends(get_current_admin_user)):
+    users = await fetch_all_users(request)
+    return users
+
+@app.delete("/admin/users/{username}")
+async def delete_user(request: Request, username: str, token: str = Depends(get_current_admin_user)):
+    result = await delete_user_by_username(request, username)
+    return result
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
