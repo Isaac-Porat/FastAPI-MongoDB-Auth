@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from pymongo.errors import PyMongoError
 from auth import get_current_user
 from fastapi import Depends, HTTPException, status, Request
+from auth import get_password_hash
 
 logger = logging.getLogger("uvicorn")
 
@@ -27,7 +28,7 @@ async def create_admin_user(request: Request):
         else:
             admin_user = {
                 "username": ADMIN_USERNAME,
-                "password": ADMIN_PASSWORD,
+                "password": get_password_hash(ADMIN_PASSWORD),
                 "is_admin": True
             }
             await collection.insert_one(admin_user)
@@ -60,7 +61,7 @@ async def get_current_admin_user(request: Request, token: str = Depends(get_curr
 
     result = await collection.find_one({"username": username})
 
-    if result != ADMIN_USERNAME:
+    if result['username'] != ADMIN_USERNAME:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Unauthorized access attempt by non-admin user",
