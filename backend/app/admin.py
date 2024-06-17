@@ -53,7 +53,6 @@ async def create_admin_user(request: Request):
         )
 
 async def get_current_admin_user(request: Request, token: str = Depends(get_current_user)):
-
     collection = request.state.collection
 
     username = token
