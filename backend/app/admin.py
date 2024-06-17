@@ -1,10 +1,9 @@
 import os
 import logging
 from dotenv import load_dotenv
-from pymongo.collection import Collection
 from pymongo.errors import PyMongoError
 from auth import get_current_user
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 
 logger = logging.getLogger("uvicorn")
 
@@ -13,37 +12,60 @@ load_dotenv()
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
-def create_admin_user(collection: Collection):
+async def create_admin_user(request: Request):
     try:
-        logger.info("Attempting to find existing admin user.")
-        existing_admin = collection.find_one({"username": ADMIN_USERNAME})
+        collection = request.state.collection
+
+        existing_admin = await collection.find_one({"username": ADMIN_USERNAME})
 
         if existing_admin:
-            logger.info("Admin user already exists.")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Admin user already exists.",
+                headers={"WWW-Authenticate": "Bearer"}
+            )
         else:
-            logger.info("Admin user not found. Creating a new admin user.")
             admin_user = {
                 "username": ADMIN_USERNAME,
                 "password": ADMIN_PASSWORD,
                 "is_admin": True
             }
-            collection.insert_one(admin_user)
-            logger.info("Admin user created successfully.")
+            await collection.insert_one(admin_user)
+            return {"status": "success", "message": "Admin user created successfully."}, 201
+
     except PyMongoError as e:
         logger.error(f"Database error while creating admin user: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error while creating admin user.",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+
+    except HTTPException:
+        raise
+
     except Exception as e:
         logger.error(f"Unexpected error while creating admin user: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error while creating admin user.",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
 
-async def get_current_admin_user(collection: Collection, token: str = Depends(get_current_user)):
+async def get_current_admin_user(request: Request, token: str = Depends(get_current_user)):
+
+    collection = request.state.collection
+
     username = token
+    logger.warning(f"Username: {username}")
 
     result = await collection.find_one({"username": username})
 
-    if result is False:
+    if result != ADMIN_USERNAME:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-          detail="Unauthorized access attempt by non-admin user",
-          headers={"WWW-Authenticate": "Bearer"},
-    )
+            detail="Unauthorized access attempt by non-admin user",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     return username
