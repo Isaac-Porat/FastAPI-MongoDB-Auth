@@ -22,9 +22,27 @@ pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 def get_password_hash(password):
+    """
+    Hashes a password using the configured password hashing context.
+
+    Args:
+    password (str): The password to hash.
+
+    Returns:
+    str: The hashed password.
+    """
     return pwd_context.hash(password)
 
 def create_access_token(data: dict):
+    """
+    Creates a JWT access token.
+
+    Args:
+    data (dict): The data to encode in the token.
+
+    Returns:
+    str: The encoded JWT token.
+    """
     to_encode = data.copy()
 
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -35,7 +53,19 @@ def create_access_token(data: dict):
     return encoded_jwt
 
 async def get_current_user(request: Request, token: str = Depends(oauth2_scheme)):
+    """
+    Retrieves the current user based on the provided JWT token.
 
+    Args:
+    request (Request): The request object that includes the database collection.
+    token (str): The JWT token.
+
+    Returns:
+    str: The username of the current user.
+
+    Raises:
+    HTTPException: If the token is invalid or the user does not exist.
+    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -57,23 +87,30 @@ async def get_current_user(request: Request, token: str = Depends(oauth2_scheme)
     return username
 
 async def register_user(request: Request, user_data: OAuth2PasswordRequestForm) -> Token:
+    """
+    Registers a new user in the database.
+
+    Args:
+    request (Request): The request object that includes the database collection.
+    user_data (OAuth2PasswordRequestForm): The user data from the registration form.
+
+    Returns:
+    Token: The access token and token type for the new user.
+
+    Raises:
+    HTTPException: If the username already exists, there is a database error, or an unexpected error occurs.
+    """
     try:
-        # Load in database collection
         collection = request.state.collection
 
-        # Check if the username already exists in the database
         await check_username_exists(collection, user_data.username)
 
-        # Hash the password using a secure hashing algorithm
         hashed_password = get_password_hash(user_data.password)
 
-        # Insert the new user into the database
         result = await collection.insert_one({"username": user_data.username, "password": hashed_password})
 
-        # Generate an access token for the new user
         access_token = create_access_token(data={"sub": str(user_data.username)})
 
-        # Return the access token and token type
         return Token(access_token=access_token, token_type="bearer")
 
     except UsernameAlreadyExistsException as e:
@@ -99,11 +136,22 @@ async def register_user(request: Request, user_data: OAuth2PasswordRequestForm) 
         )
 
 async def login_user(request: Request, user: OAuth2PasswordRequestForm = Depends()) -> Token:
+    """
+    Logs in a user by verifying their credentials and generating an access token.
+
+    Args:
+    request (Request): The request object that includes the database collection.
+    user (OAuth2PasswordRequestForm): The user data from the login form.
+
+    Returns:
+    Token: The access token and token type for the logged-in user.
+
+    Raises:
+    HTTPException: If the username or password is incorrect, there is a database error, or an unexpected error occurs.
+    """
     try:
-        # Load in database collection
         collection = request.state.collection
 
-        # Check if the username exists in the database
         result = await collection.find_one({"username": user.username})
 
         if result is None:
@@ -113,7 +161,6 @@ async def login_user(request: Request, user: OAuth2PasswordRequestForm = Depends
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        # If the username exists, check to ensure the password and hashed password are the same
         if not pwd_context.verify(user.password, result['password']):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -121,10 +168,8 @@ async def login_user(request: Request, user: OAuth2PasswordRequestForm = Depends
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        # Generate an access token for the new user
         access_token = create_access_token(data={"sub": str(user.username)})
 
-        # Return the access token and token type
         return Token(access_token=access_token, token_type="bearer")
 
     except HTTPException as e:

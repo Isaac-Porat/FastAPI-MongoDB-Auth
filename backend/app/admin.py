@@ -14,6 +14,18 @@ ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
 async def create_admin_user(request: Request):
+    """
+    Asynchronously creates an admin user in the database if one does not already exist.
+
+    Args:
+    request (Request): The request object that includes the database collection.
+
+    Returns:
+    tuple: A success message with status code 201 if the admin user is created successfully.
+
+    Raises:
+    HTTPException: If an admin user already exists or if there is a database error.
+    """
     try:
         collection = request.state.collection
 
@@ -54,6 +66,19 @@ async def create_admin_user(request: Request):
         )
 
 async def get_current_admin_user(request: Request, token: str = Depends(get_current_user)):
+    """
+    Retrieves the current admin user based on the provided token.
+
+    Args:
+    request (Request): The request object that includes the database collection.
+    token (str): The token that identifies the user.
+
+    Returns:
+    str: The username of the admin user if the token is valid and the user is an admin.
+
+    Raises:
+    HTTPException: If the user is not an admin or if the token does not correspond to a valid user.
+    """
     collection = request.state.collection
 
     username = token
